@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Aujourd'hui tu es...</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,600;1,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f6f3ee; --card:#fdfcf9; --title:#8d4a5b; --text:#4a4440;
+    --soft:#9a938c; --green:#7e9670; --green-dark:#6d8560; --yellow:#d3b45f;
+    --grey:#a9a49d; --border:#dcd7cf; --plum:#8d2f55;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  body{
+    margin:0; min-height:100dvh; background:var(--bg); color:var(--text);
+    font-family:'Nunito', ui-rounded, system-ui, sans-serif;
+    display:flex; flex-direction:column; align-items:center;
+    padding:max(18px, env(safe-area-inset-top)) 10px max(14px, env(safe-area-inset-bottom));
+  }
+  h1{
+    font-family:'Cormorant Garamond', Georgia, serif; font-style:italic; font-weight:700;
+    font-size:clamp(30px, 8.5vw, 46px); color:var(--title); margin:6px 0 0; text-align:center;
+  }
+  h1 span{border-bottom:2px solid var(--title); padding-bottom:2px}
+  .tagline{color:var(--soft); font-style:italic; margin:10px 14px 18px; text-align:center; max-width:340px; font-size:15px}
+
+  #grid{display:flex; flex-direction:column; gap:7px; margin-bottom:14px}
+  .row{display:flex; gap:7px}
+  .tile{
+    width:clamp(44px, 13.5vw, 60px); height:clamp(44px, 13.5vw, 60px);
+    border-radius:11px; display:flex; align-items:center; justify-content:center;
+    font-size:clamp(19px, 5.5vw, 25px); font-weight:800;
+    border:2px solid var(--border); background:transparent;
+    transition:transform .12s ease, background .3s ease; user-select:none;
+  }
+  .tile.filled{background:var(--card); border-color:var(--soft); transform:scale(1.05)}
+  .tile.correct{background:var(--green); border-color:var(--green); color:#fff; box-shadow:inset 0 -3px 0 var(--green-dark)}
+  .tile.present{background:var(--yellow); border-color:var(--yellow); color:#fff}
+  .tile.absent{background:var(--grey); border-color:var(--grey); color:#fff}
+  .tile.hintTile{border:2px dashed var(--green); color:var(--green)}
+  .row.shake{animation:shakeRow .45s ease}
+  @keyframes shakeRow{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+
+  #hintBtn{
+    border:1.5px solid var(--border); background:transparent; color:var(--text);
+    border-radius:999px; padding:9px 22px; font-family:inherit; font-weight:600; font-size:14px;
+  }
+  #hintBtn:disabled{color:var(--soft)}
+  #msg{height:20px; color:var(--plum); font-weight:700; font-size:14px; margin:6px 0 2px}
+
+  #keyboard{width:100%; max-width:480px; display:flex; flex-direction:column; gap:6px}
+  .krow{display:flex; gap:5px}
+  .key{
+    flex:1; min-width:0; padding:14px 0; border-radius:8px; border:none;
+    font-family:inherit; font-weight:700; font-size:15px; color:var(--text);
+    background:#e8e3db; transition:background .25s ease; touch-action:manipulation;
+  }
+  .key.wide{flex:1.6; font-size:11px; letter-spacing:.5px}
+  .key.correct{background:var(--green); color:#fff}
+  .key.present{background:var(--yellow); color:#fff}
+  .key.absent{background:var(--grey); color:#fff}
+  .credit{color:var(--soft); font-style:italic; font-size:13px; margin-top:20px}
+
+  #overlay{
+    position:fixed; inset:0; background:rgba(60,50,45,.35);
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  #overlay.show{display:flex}
+  #modal{
+    background:var(--card); border-radius:20px; padding:38px 28px; max-width:400px; width:100%;
+    text-align:center; box-shadow:0 18px 50px rgba(0,0,0,.18); animation:popIn .3s ease;
+  }
+  @keyframes popIn{from{opacity:0; transform:scale(.92)}to{opacity:1; transform:scale(1)}}
+  #modal h2{font-family:'Cormorant Garamond', Georgia, serif; font-size:34px; margin:0 0 12px}
+  #modal .word{color:var(--plum)}
+  #modal .sub{color:var(--soft); font-style:italic; margin:0 0 24px}
+  #again{
+    background:var(--plum); color:#fff; border:none; border-radius:999px;
+    padding:14px 38px; font-size:17px; font-weight:700; font-family:inherit;
+  }
+  @media (prefers-reduced-motion: reduce){*{animation:none!important; transition:none!important}}
+  button:focus-visible{outline:3px solid var(--plum); outline-offset:2px}
+</style>
+</head>
+<body>
+  <h1>♡ <span>Aujourd'hui tu es</span>... ♡</h1>
+  <p class="tagline" id="tagline"></p>
+
+  <div id="grid"></div>
+
+  <button id="hintBtn">💡 Indice (<span id="hintCount">2</span> restants)</button>
+  <div id="msg"></div>
+
+  <div id="keyboard"></div>
+  <p class="credit">Fait avec amour ♡</p>
+
+  <div id="overlay">
+    <div id="modal">
+      <h2 id="modalTitle">Trouvé !</h2>
+      <p style="font-size:19px; margin:0 0 8px">Aujourd'hui tu es : <strong class="word" id="modalWord"></strong> ! 💕</p>
+      <p class="sub" id="modalSub"></p>
+      <button id="again">Rejouer</button>
+    </div>
+  </div>
+
+<script>
+const WORDS = [
+  { word:"JOLIE", tagline:"Tu embellis tout ce qui t'entoure" },
+  { word:"BELLE", tagline:"Dedans comme dehors, ça se voit tout de suite" },
+  { word:"DOUCE", tagline:"Ta présence apaise tout ce qu'elle touche" },
+  { word:"VRAIE", tagline:"Aucun masque, et c'est ce qui te rend rare" },
+  { word:"FIERE", tagline:"Tu tiens debout, élégante, quoi qu'il arrive" },
+  { word:"DROLE", tagline:"Tu illumines les journées des autres" },
+  { word:"FUTEE", tagline:"Tu vois les solutions avant les problèmes" },
+  { word:"SUAVE", tagline:"Tu traverses la vie avec une élégance rare" },
+];
+const ROWS = 6, COLS = 5;
+const KEY_ROWS = [
+  ["A","Z","E","R","T","Y","U","I","O","P"],
+  ["Q","S","D","F","G","H","J","K","L","M"],
+  ["ENTREE","W","X","C","V","B","N","EFF"],
+];
+
+let current, guesses, draft, status, hintsLeft, revealed, msgTimer;
+
+const $ = id => document.getElementById(id);
+const grid = $("grid"), keyboard = $("keyboard");
+
+function pickWord(exclude){
+  const opts = WORDS.filter(w => w.word !== exclude);
+  return opts[Math.floor(Math.random()*opts.length)];
+}
+
+function evaluate(guess, target){
+  const res = Array(COLS).fill("absent"), pool = {};
+  for(let i=0;i<COLS;i++){
+    if(guess[i]===target[i]) res[i]="correct";
+    else pool[target[i]] = (pool[target[i]]||0)+1;
+  }
+  for(let i=0;i<COLS;i++){
+    if(res[i]==="correct") continue;
+    if(pool[guess[i]]>0){ res[i]="present"; pool[guess[i]]--; }
+  }
+  return res;
+}
+
+function flash(m){
+  $("msg").textContent = m;
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(()=>$("msg").textContent="", 1600);
+}
+
+function buildKeyboard(){
+  keyboard.innerHTML = "";
+  KEY_ROWS.forEach(row=>{
+    const div = document.createElement("div");
+    div.className = "krow";
+    row.forEach(k=>{
+      const b = document.createElement("button");
+      b.className = "key" + (k==="ENTREE"||k==="EFF" ? " wide" : "");
+      b.dataset.key = k;
+      b.textContent = k==="EFF" ? "⌫" : k==="ENTREE" ? "ENTRÉE" : k;
+      b.onclick = ()=>onKey(k);
+      div.appendChild(b);
+    });
+    keyboard.appendChild(div);
+  });
+}
+
+function keyStates(){
+  const st = {};
+  guesses.forEach(g=>{
+    g.letters.forEach((l,i)=>{
+      const m = g.marks[i], p = st[l];
+      if(m==="correct") st[l]="correct";
+      else if(m==="present" && p!=="correct") st[l]="present";
+      else if(!p) st[l]=m;
+    });
+  });
+  return st;
+}
+
+function render(shakeRow=false){
+  grid.innerHTML = "";
+  const target = current.word;
+  for(let r=0;r<ROWS;r++){
+    const row = document.createElement("div");
+    row.className = "row" + (shakeRow && r===guesses.length ? " shake" : "");
+    for(let c=0;c<COLS;c++){
+      const t = document.createElement("div");
+      t.className = "tile";
+      const g = guesses[r];
+      if(g){
+        t.classList.add(g.marks[c]);
+        t.textContent = g.letters[c];
+      } else if(r===guesses.length && status==="playing"){
+        if(draft[c]){ t.classList.add("filled"); t.textContent = draft[c]; }
+        else if(revealed.includes(c)){ t.style.opacity=".45"; t.textContent = target[c]; }
+      } else if(revealed.includes(c)){
+        t.classList.add("hintTile");
+        t.textContent = target[c];
+      }
+      row.appendChild(t);
+    }
+    grid.appendChild(row);
+  }
+  const st = keyStates();
+  document.querySelectorAll(".key").forEach(b=>{
+    b.classList.remove("correct","present","absent");
+    const s = st[b.dataset.key];
+    if(s) b.classList.add(s);
+  });
+  $("hintCount").textContent = hintsLeft;
+  $("hintBtn").disabled = hintsLeft<=0 || status!=="playing";
+}
+
+function submit(){
+  if(status!=="playing") return;
+  if(draft.length<COLS){ render(true); flash("Il faut 5 lettres"); return; }
+  const marks = evaluate(draft, current.word);
+  guesses.push({ letters: draft.split(""), marks });
+  const won = draft===current.word;
+  draft = "";
+  if(won) status = "won";
+  else if(guesses.length>=ROWS) status = "lost";
+  render();
+  if(status!=="playing") setTimeout(showEnd, 500);
+}
+
+function showEnd(){
+  $("modalTitle").textContent = status==="won" ? "Trouvé !" : "Presque...";
+  $("modalWord").textContent = current.word;
+  $("modalSub").textContent = current.tagline;
+  $("overlay").classList.add("show");
+}
+
+function onKey(k){
+  if(status!=="playing") return;
+  if(k==="ENTREE") return submit();
+  if(k==="EFF"){ draft = draft.slice(0,-1); return render(); }
+  if(/^[A-Z]$/.test(k) && draft.length<COLS){ draft += k; render(); }
+}
+
+function useHint(){
+  if(hintsLeft<=0 || status!=="playing") return;
+  const found = new Set(revealed);
+  guesses.forEach(g=>g.marks.forEach((m,i)=>{ if(m==="correct") found.add(i); }));
+  const cand = [...Array(COLS).keys()].filter(i=>!found.has(i));
+  if(!cand.length) return flash("Tout est déjà trouvé !");
+  const idx = cand[Math.floor(Math.random()*cand.length)];
+  revealed.push(idx);
+  hintsLeft--;
+  flash("Lettre " + (idx+1) + " : « " + current.word[idx] + " »");
+  render();
+}
+
+function newGame(){
+  current = pickWord(current ? current.word : null);
+  guesses = []; draft = ""; status = "playing"; hintsLeft = 2; revealed = [];
+  $("tagline").textContent = current.tagline;
+  $("overlay").classList.remove("show");
+  render();
+}
+
+$("hintBtn").onclick = useHint;
+$("again").onclick = newGame;
+window.addEventListener("keydown", e=>{
+  if(e.key==="Enter") onKey("ENTREE");
+  else if(e.key==="Backspace") onKey("EFF");
+  else if(/^[a-zA-Z]$/.test(e.key)) onKey(e.key.toUpperCase());
+});
+
+buildKeyboard();
+newGame();
+</script>
+</body>
+</html>
